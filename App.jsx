@@ -149,8 +149,8 @@ function App() {
 
     autoTable(doc, {
       startY: 232,
-      head: [["Cód.", "Producto", "Cant.", "Unidad", "%", "P. Unit.", "Importe"]],
-      body: items.map(i => [i.code, i.name, i.quantity, i.unit, `${i.pct}%`, money(i.unitPrice), money(i.lineTotal)]),
+      head: [["Cód.", "Producto", "Cant.", "Unidad", "P. Unit.", "Importe"]],
+      body: items.map(i => [i.code, i.name, i.quantity, i.unit, money(i.unitPrice), money(i.lineTotal)]),
       styles: { fontSize: 8, cellPadding: 5 },
       headStyles: { fillColor: [12, 29, 46] },
       columnStyles: { 1: { cellWidth: 180 }, 5: { halign: "right" }, 6: { halign: "right" } },
