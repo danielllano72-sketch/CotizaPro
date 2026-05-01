@@ -1,5 +1,5 @@
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -62,13 +62,19 @@ function plusDaysISO(days) {
 
 function App() {
   const fileRef = useRef(null);
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState(() => {
+  const saved = localStorage.getItem("cotizapro_products");
+  return saved ? JSON.parse(saved) : initialProducts;
+});
   const [supplier, setSupplier] = useState("GCP");
   const [query, setQuery] = useState("");
   const [globalPct, setGlobalPct] = useState(15);
   const [client, setClient] = useState({ name: "", email: "", company: "" });
   const [folio, setFolio] = useState("COT-000001");
   const [items, setItems] = useState([]);
+  useEffect(() => {
+  localStorage.setItem("cotizapro_products", JSON.stringify(products));
+}, [products]);
   const [issueDate] = useState(todayISO());
   const [dueDate] = useState(plusDaysISO(7));
 
