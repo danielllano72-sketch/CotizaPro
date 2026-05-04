@@ -64,7 +64,7 @@ function App() {
   const fileRef = useRef(null);
   const [products, setProducts] = useState(() => {
   const saved = localStorage.getItem("cotizapro_products");
-  return saved ? JSON.parse(saved) : initialProducts;
+  return saved ? JSON.parse(saved) : [];
 });
   const [supplier, setSupplier] = useState("GCP");
   const [query, setQuery] = useState("");
