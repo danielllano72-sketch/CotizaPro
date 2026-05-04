@@ -70,6 +70,13 @@ function App() {
   const [query, setQuery] = useState("");
   const [globalPct, setGlobalPct] = useState(15);
   const [client, setClient] = useState({ name: "", email: "", company: "" });
+  const [view, setView] = useState("quote");
+const [quotes, setQuotes] = useState([]);
+
+useEffect(() => {
+  const saved = JSON.parse(localStorage.getItem("cotizapro_quotes")) || [];
+  setQuotes(saved);
+}, []);
   const [folio, setFolio] = useState("COT-000001");
   const [items, setItems] = useState([]);
   useEffect(() => {
