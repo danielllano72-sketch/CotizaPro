@@ -124,7 +124,39 @@ function App() {
     setFolio(`COT-${String(Number(folio.replace(/\D/g, "")) + 1).padStart(6, "0")}`);
     alert("Cotización duplicada.");
   }
+function saveQuote() {
+  if (!client.name && !client.company) {
+    alert("Agrega al menos nombre o empresa del cliente.");
+    return;
+  }
 
+  if (items.length === 0) {
+    alert("Agrega productos antes de guardar.");
+    return;
+  }
+
+  const savedQuotes = JSON.parse(localStorage.getItem("cotizapro_quotes")) || [];
+
+  const quote = {
+    id: folio,
+    client,
+    issueDate,
+    dueDate,
+    items,
+    subtotal,
+    iva,
+    total,
+    globalPct,
+    createdAt: new Date().toISOString()
+  };
+
+  localStorage.setItem(
+    "cotizapro_quotes",
+    JSON.stringify([...savedQuotes, quote])
+  );
+
+  alert(`Cotización ${folio} guardada correctamente.`);
+}
   function generatePdf() {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
