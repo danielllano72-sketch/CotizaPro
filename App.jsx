@@ -222,9 +222,16 @@ function saveQuote() {
     <div className="app">
       <aside className="sidebar">
         <div className="brand"><div className="mark">AE</div><div><h1>COTIZAPRO</h1><p>Aseo Empresarial</p></div></div>
-        <nav><a className="active">Nueva Cotización</a><a>Catálogos</a><a>Clientes</a><a>Historial</a></nav>
+       <nav>
+  <a className={view === "quote" ? "active" : ""} onClick={() => setView("quote")}>Nueva Cotización</a>
+  <a>Catálogos</a>
+  <a>Clientes</a>
+  <a className={view === "history" ? "active" : ""} onClick={() => setView("history")}>Historial</a>
+</nav>
       </aside>
       <main className="main">
+        {view === "quote" && (
+           <>
         <header className="topbar">
           <div><h2>Nueva cotización</h2><p>Flujo rápido para celular y web</p></div>
           <button className="primary" onClick={generatePdf} disabled={!items.length}><FileDown size={18}/> Generar PDF</button>
@@ -297,6 +304,25 @@ function saveQuote() {
             <button className="primary full" onClick={generatePdf} disabled={!items.length}><FileDown size={18}/> Generar PDF</button>
           </div>
         </section>
+      </>
+)}
+
+{view === "history" && (
+  <div className="card">
+    <h3>Historial de cotizaciones</h3>
+
+    {quotes.length === 0 && <p>No hay cotizaciones guardadas</p>}
+
+    {quotes.map(q => (
+      <div key={q.id} style={{ borderBottom: "1px solid #eee", padding: "10px 0" }}>
+        <strong>{q.id}</strong>
+        <div>{q.client?.name || "Sin nombre"} - {q.client?.company || ""}</div>
+        <div>Total: {money(q.total)}</div>
+        <div>Porcentaje: {q.globalPct}%</div>
+      </div>
+    ))}
+  </div>
+)}
       </main>
     </div>
   );
