@@ -96,7 +96,7 @@ function App() {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
     const parsed = rows.map(r => normalizeRow(r, supplier)).filter(p => p.name && p.cost > 0);
-    setProducts(prev => [...parsed, ...prev]);
+    setProducts(parsed);
     alert(`Importados ${parsed.length} productos de ${supplier}`);
   }
 
