@@ -192,7 +192,7 @@ function App() {
         </header>
 
         <section className="grid">
-          <div className="card client">
+          <div className="card client" style={{ position: "relative", zIndex: 10 }}>
             <h3>Datos del cliente</h3>
             <div className="fields">
               <label>Nombre<input value={client.name} onChange={e=>setClient({...client, name:e.target.value})} placeholder="Gabriela Flores Méndez"/></label>
