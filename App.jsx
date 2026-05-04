@@ -73,7 +73,9 @@ function App() {
   const [folio, setFolio] = useState("COT-000001");
   const [items, setItems] = useState([]);
   useEffect(() => {
-  localStorage.setItem("cotizapro_products", JSON.stringify(products));
+  if (products.length > 0) {
+    localStorage.setItem("cotizapro_products", JSON.stringify(products));
+  }
 }, [products]);
   const [issueDate] = useState(todayISO());
   const [dueDate] = useState(plusDaysISO(7));
