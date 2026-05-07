@@ -321,36 +321,35 @@ setQuotes([...savedQuotes, quote]);
         </section>
       </>
 )}
-
 {view === "history" && (
   <div className="card">
     <h3>Historial de cotizaciones</h3>
 
     {quotes.length === 0 && <p>No hay cotizaciones guardadas</p>}
-    {quotes.map((q) => {
-  return (
-    <div
-      key={q.id}
-      onClick={() => loadQuote(q)}
-      style={{
-        background: "transparent",
-        border: "0",
-        textAlign: "left",
-        width: "100%",
-        borderBottom: "1px solid #eee",
-        padding: "10px 0",
-        cursor: "pointer"
-      }}
-    >
-      <strong>{q.id}</strong>
-      <div>{q.client?.name || "Sin nombre"} - {q.client?.company || ""}</div>
-      <div>Total: {money(q.total)}</div>
-      <div>Porcentaje: {q.globalPct}%</div>
-    </div>
-  );
-})}
-</div> 
-      </main>
+
+    {quotes.map((q) => (
+      <button
+        key={q.id}
+        type="button"
+        onClick={() => loadQuote(q)}
+        style={{
+          background: "transparent",
+          border: "0",
+          textAlign: "left",
+          width: "100%",
+          borderBottom: "1px solid #eee",
+          padding: "10px 0",
+          cursor: "pointer"
+        }}
+      >
+        <strong>{q.id}</strong>
+        <div>{q.client?.name || "Sin nombre"} - {q.client?.company || ""}</div>
+        <div>Total: {money(q.total)}</div>
+        <div>Porcentaje: {q.globalPct}%</div>
+      </button>
+    ))}
+  </div>
+)}
     </div>
   );
 }
