@@ -349,7 +349,8 @@ setQuotes([...savedQuotes, quote]);
         <div>Porcentaje: {q.globalPct}%</div>
       </button>
 ))}
-</div>
+</div> 
+  )}
       </main>
     </div>
   );
