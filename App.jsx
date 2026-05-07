@@ -164,6 +164,13 @@ function saveQuote() {
 setQuotes([...savedQuotes, quote]);
   alert(`Cotización ${folio} guardada correctamente.`);
 }
+  function loadQuote(q) {
+  setFolio(q.id);
+  setClient(q.client);
+  setItems(q.items);
+  setGlobalPct(q.globalPct || 15);
+  setView("quote");
+}
   function generatePdf() {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -322,7 +329,15 @@ setQuotes([...savedQuotes, quote]);
     {quotes.length === 0 && <p>No hay cotizaciones guardadas</p>}
 
     {quotes.map(q => (
-      <div key={q.id} style={{ borderBottom: "1px solid #eee", padding: "10px 0" }}>
+      <div
+  key={q.id}
+  onClick={() => loadQuote(q)}
+  style={{
+    borderBottom: "1px solid #eee",
+    padding: "10px 0",
+    cursor: "pointer"
+  }}
+>
         <strong>{q.id}</strong>
         <div>{q.client?.name || "Sin nombre"} - {q.client?.company || ""}</div>
         <div>Total: {money(q.total)}</div>
