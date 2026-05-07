@@ -329,21 +329,25 @@ setQuotes([...savedQuotes, quote]);
     {quotes.length === 0 && <p>No hay cotizaciones guardadas</p>}
 
     {quotes.map(q => (
-      <div
+      <button
   key={q.id}
   onClick={() => loadQuote(q)}
-  style={{
-    borderBottom: "1px solid #eee",
-    padding: "10px 0",
-    cursor: "pointer"
-  }}
+ style={{
+  background: "transparent",
+  border: "0",
+  textAlign: "left",
+  width: "100%",
+  borderBottom: "1px solid #eee",
+  padding: "10px 0",
+  cursor: "pointer"
+}}
 >
         <strong>{q.id}</strong>
         <div>{q.client?.name || "Sin nombre"} - {q.client?.company || ""}</div>
         <div>Total: {money(q.total)}</div>
         <div>Porcentaje: {q.globalPct}%</div>
-      </div>
-    ))}
+      </button>
+    )}
   </div>
 )}
       </main>
