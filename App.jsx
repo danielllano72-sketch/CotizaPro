@@ -294,6 +294,7 @@ setQuotes([...savedQuotes, quote]);
                 ))}
               </div>
             )}
+            </div>
             <div className="actions">
   <button onClick={duplicateQuote}>
     <Copy size={16}/> Duplicar
