@@ -294,10 +294,15 @@ setQuotes([...savedQuotes, quote]);
                 ))}
               </div>
             )}
-            <div className="actions"><button onClick={saveQuote} disabled={!items.length}>
-  <Save size={16}/> Guardar
-</button> 
-          </div>
+            <div className="actions">
+  <button onClick={duplicateQuote}>
+    <Copy size={16}/> Duplicar
+  </button>
+
+  <button onClick={saveQuote} disabled={!items.length}>
+    <Save size={16}/> Guardar
+  </button>
+</div>
           <div className="card summary">
             <h3>Resumen</h3>
             <p><span>Subtotal</span><b>{money(subtotal)}</b></p>
