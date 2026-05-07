@@ -350,7 +350,6 @@ setQuotes([...savedQuotes, quote]);
     ))}
   </div>
 )}
-    </div>
+    </main>
   );
-}
 createRoot(document.getElementById("root")).render(<App />);
