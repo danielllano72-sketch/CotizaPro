@@ -349,7 +349,7 @@ setQuotes([...savedQuotes, quote]);
       </button>
     )}
   </div>
-)}
+))}
       </main>
     </div>
   );
