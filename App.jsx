@@ -161,7 +161,7 @@ function saveQuote() {
     "cotizapro_quotes",
     JSON.stringify([...savedQuotes, quote])
   );
-
+setQuotes([...savedQuotes, quote]);
   alert(`Cotización ${folio} guardada correctamente.`);
 }
   function generatePdf() {
@@ -231,7 +231,7 @@ function saveQuote() {
       </aside>
       <main className="main">
         {view === "quote" && (
-           <>
+      <>
         <header className="topbar">
           <div><h2>Nueva cotización</h2><p>Flujo rápido para celular y web</p></div>
           <button className="primary" onClick={generatePdf} disabled={!items.length}><FileDown size={18}/> Generar PDF</button>
@@ -294,7 +294,9 @@ function saveQuote() {
                 ))}
               </div>
             )}
-            <div className="actions"><button onClick={duplicateQuote}><Copy size={16}/> Duplicar</button><button><Save size={16}/> Guardar</button></div>
+            <div className="actions"><button onClick={saveQuote} disabled={!items.length}>
+  <Save size={16}/> Guardar
+</button> 
           </div>
           <div className="card summary">
             <h3>Resumen</h3>
