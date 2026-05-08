@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as XLSX from "xlsx";
@@ -8,6 +7,7 @@ import { Search, Upload, Plus, Trash2, FileDown, Copy, Save } from "lucide-react
 import "./style.css";
 
 const IVA_RATE = 0.16;
+
 const fixedNotes = [
   "Condiciones de pago anticipado a la entrega",
   "Forma de pago transferencia",
@@ -29,181 +29,304 @@ const initialProducts = [
   { supplier: "Uniplas", code: "BNR90120", name: "Bolsa negra en rollo 90x1.20", unit: "Kilo", cost: 42 },
 ];
 
-function money(n) {
-  return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(Number(n || 0));
+function safeParse(value, fallback) {
+  try {
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
 }
+
+function money(n) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+  }).format(Number(n || 0));
+}
+
 function parseNumber(v) {
   if (typeof v === "number") return v;
   if (!v) return 0;
   return Number(String(v).replace(/\$/g, "").replace(/,/g, "").trim()) || 0;
 }
+
 function normalizeRow(row, supplier = "Importado") {
-  const keys = Object.fromEntries(Object.entries(row).map(([k, v]) => [
-    String(k).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim(), v
-  ]));
+  const keys = Object.fromEntries(
+    Object.entries(row).map(([k, v]) => [
+      String(k).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim(),
+      v,
+    ])
+  );
+
   const code = keys.codigo || keys.cod || keys.clave || keys.sku || keys["codigo sap"] || "";
   const name = keys.producto || keys.descripcion || keys.description || keys.nombre || keys.articulo || "";
   const unit = keys.unidad || keys.unit || "Pieza";
   const cost = parseNumber(keys.precio || keys.costo || keys["precio unitario"] || keys["costo compra"] || keys.cost);
-  return { supplier, code: String(code || ""), name: String(name || ""), unit: String(unit || "Pieza"), cost };
+
+  return {
+    supplier,
+    code: String(code || ""),
+    name: String(name || ""),
+    unit: String(unit || "Pieza"),
+    cost,
+  };
 }
+
 function quotedPrice(cost, pct) {
   const p = Number(pct || 0);
   const divisor = 1 - p / 100;
   if (divisor <= 0) return 0;
   return Math.round((Number(cost || 0) / divisor) * 100) / 100;
 }
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function plusDaysISO(days) {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
+function getNumberFromFolio(id) {
+  return Number(String(id || "").replace(/\D/g, "")) || 0;
+}
+
+function makeFolio(num) {
+  return `COT-${String(num).padStart(6, "0")}`;
+}
+
+function getNextFolioFromQuotes(quotes) {
+  const nums = quotes.map((q) => getNumberFromFolio(q.id));
+  const next = Math.max(0, ...nums) + 1;
+  return makeFolio(next);
+}
+
+function fixDuplicateFolios(quotes) {
+  const used = new Set();
+
+  return quotes.map((q, index) => {
+    let id = q.id || makeFolio(index + 1);
+
+    if (used.has(id)) {
+      id = makeFolio(index + 1);
+    }
+
+    while (used.has(id)) {
+      id = makeFolio(getNumberFromFolio(id) + 1);
+    }
+
+    used.add(id);
+    return { ...q, id };
+  });
+}
+
 function App() {
   const fileRef = useRef(null);
+
   const [products, setProducts] = useState(() => {
-  const saved = localStorage.getItem("cotizapro_products");
-  return saved ? JSON.parse(saved) : [];
-});
+    const saved = safeParse(localStorage.getItem("cotizapro_products"), null);
+    return Array.isArray(saved) && saved.length > 0 ? saved : initialProducts;
+  });
+
   const [supplier, setSupplier] = useState("GCP");
   const [query, setQuery] = useState("");
+  const [historyQuery, setHistoryQuery] = useState("");
   const [globalPct, setGlobalPct] = useState(15);
   const [client, setClient] = useState({ name: "", email: "", company: "" });
   const [view, setView] = useState("quote");
-const [quotes, setQuotes] = useState([]);
-
-useEffect(() => {
-  const saved = JSON.parse(localStorage.getItem("cotizapro_quotes")) || [];
-  setQuotes(saved);
-}, []);
-  const getNextFolio = () => {
-  const savedQuotes = JSON.parse(localStorage.getItem("cotizapro_quotes")) || [];
-  const nums = savedQuotes.map(q => Number(String(q.id).replace(/\D/g, "")) || 0);
-  const next = Math.max(0, ...nums) + 1;
-  return `COT-${String(next).padStart(6, "0")}`;
-};
-
-const [folio, setFolio] = useState("COT-000001");
+  const [quotes, setQuotes] = useState([]);
+  const [folio, setFolio] = useState("COT-000001");
   const [items, setItems] = useState([]);
-  useEffect(() => {
-  if (products.length > 0) {
-    localStorage.setItem("cotizapro_products", JSON.stringify(products));
-  }
-}, [products]);
   const [issueDate] = useState(todayISO());
   const [dueDate] = useState(plusDaysISO(7));
+
+  useEffect(() => {
+    const saved = safeParse(localStorage.getItem("cotizapro_quotes"), []);
+    const fixed = fixDuplicateFolios(Array.isArray(saved) ? saved : []);
+
+    localStorage.setItem("cotizapro_quotes", JSON.stringify(fixed));
+    setQuotes(fixed);
+    setFolio(getNextFolioFromQuotes(fixed));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("cotizapro_products", JSON.stringify(products));
+  }, [products]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
     if (!q) return products.slice(0, 25);
-    return products.filter(p => `${p.supplier} ${p.code} ${p.name}`.toLowerCase().includes(q)).slice(0, 25);
+
+    return products
+      .filter((p) => `${p.supplier} ${p.code} ${p.name}`.toLowerCase().includes(q))
+      .slice(0, 25);
   }, [products, query]);
 
-  const subtotal = useMemo(() => items.reduce((s, i) => s + i.lineTotal, 0), [items]);
+  const filteredQuotes = useMemo(() => {
+    const q = historyQuery.toLowerCase().trim();
+    if (!q) return quotes;
+
+    return quotes.filter((quote) => {
+      const text = `${quote.id} ${quote.client?.name || ""} ${quote.client?.company || ""} ${quote.total || ""}`.toLowerCase();
+      return text.includes(q);
+    });
+  }, [quotes, historyQuery]);
+
+  const subtotal = useMemo(() => {
+    return items.reduce((s, i) => s + Number(i.lineTotal || 0), 0);
+  }, [items]);
+
   const iva = Math.round(subtotal * IVA_RATE * 100) / 100;
   const total = Math.round((subtotal + iva) * 100) / 100;
 
   async function handleUpload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: "array" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-    const parsed = rows.map(r => normalizeRow(r, supplier)).filter(p => p.name && p.cost > 0);
-    setProducts(prev => {
-  const sinEsteProveedor = prev.filter(p => p.supplier !== supplier);
-  return [...sinEsteProveedor, ...parsed];
-});
+
+    const parsed = rows
+      .map((r) => normalizeRow(r, supplier))
+      .filter((p) => p.name && p.cost > 0);
+
+    setProducts((prev) => {
+      const sinEsteProveedor = prev.filter((p) => p.supplier !== supplier);
+      return [...sinEsteProveedor, ...parsed];
+    });
+
     alert(`Importados ${parsed.length} productos de ${supplier}`);
   }
 
   function addProduct(product) {
     const pct = Number(globalPct || 0);
     const unitPrice = quotedPrice(product.cost, pct);
-    setItems(prev => [...prev, { ...product, quantity: 1, pct, unitPrice, lineTotal: unitPrice }]);
+
+    setItems((prev) => [
+      ...prev,
+      {
+        ...product,
+        quantity: 1,
+        pct,
+        unitPrice,
+        lineTotal: unitPrice,
+      },
+    ]);
   }
+
   function updateItem(idx, patch) {
-    setItems(prev => prev.map((item, i) => {
-      if (i !== idx) return item;
-      const next = { ...item, ...patch };
-      next.unitPrice = quotedPrice(next.cost, next.pct);
-      next.lineTotal = Math.round(next.quantity * next.unitPrice * 100) / 100;
-      return next;
-    }));
+    setItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== idx) return item;
+
+        const next = { ...item, ...patch };
+        next.unitPrice = quotedPrice(next.cost, next.pct);
+        next.lineTotal = Math.round(Number(next.quantity || 0) * Number(next.unitPrice || 0) * 100) / 100;
+
+        return next;
+      })
+    );
   }
-  function removeItem(idx) { setItems(prev => prev.filter((_, i) => i !== idx)); }
+
+  function removeItem(idx) {
+    setItems((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function newQuote() {
+    const savedQuotes = safeParse(localStorage.getItem("cotizapro_quotes"), []);
+    setFolio(getNextFolioFromQuotes(Array.isArray(savedQuotes) ? savedQuotes : []));
+    setClient({ name: "", email: "", company: "" });
+    setItems([]);
+    setGlobalPct(15);
+    setView("quote");
+  }
+
   function duplicateQuote() {
-    setFolio(`COT-${String(Number(folio.replace(/\D/g, "")) + 1).padStart(6, "0")}`);
-    alert("Cotización duplicada.");
-  }
-function saveQuote() {
-  if (!client.name && !client.company) {
-    alert("Agrega al menos nombre o empresa del cliente.");
-    return;
+    const savedQuotes = safeParse(localStorage.getItem("cotizapro_quotes"), []);
+    setFolio(getNextFolioFromQuotes(Array.isArray(savedQuotes) ? savedQuotes : []));
+    alert("Cotización duplicada como nueva.");
   }
 
-  if (items.length === 0) {
-    alert("Agrega productos antes de guardar.");
-    return;
+  function saveQuote() {
+    if (!client.name && !client.company) {
+      alert("Agrega al menos nombre o empresa del cliente.");
+      return;
+    }
+
+    if (items.length === 0) {
+      alert("Agrega productos antes de guardar.");
+      return;
+    }
+
+    const savedQuotesRaw = safeParse(localStorage.getItem("cotizapro_quotes"), []);
+    const savedQuotes = Array.isArray(savedQuotesRaw) ? fixDuplicateFolios(savedQuotesRaw) : [];
+
+    let finalFolio = folio;
+
+    if (savedQuotes.some((q) => q.id === finalFolio)) {
+      finalFolio = getNextFolioFromQuotes(savedQuotes);
+    }
+
+    const quote = {
+      id: finalFolio,
+      client,
+      issueDate,
+      dueDate,
+      items,
+      subtotal,
+      iva,
+      total,
+      globalPct,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedQuotes = fixDuplicateFolios([...savedQuotes, quote]);
+
+    localStorage.setItem("cotizapro_quotes", JSON.stringify(updatedQuotes));
+    setQuotes(updatedQuotes);
+
+    alert(`Cotización ${finalFolio} guardada correctamente.`);
+
+    setFolio(getNextFolioFromQuotes(updatedQuotes));
   }
 
-  const savedQuotes = JSON.parse(localStorage.getItem("cotizapro_quotes")) || [];
-
-  const quote = {
-    id: folio,
-    client,
-    issueDate,
-    dueDate,
-    items,
-    subtotal,
-    iva,
-    total,
-    globalPct,
-    createdAt: new Date().toISOString()
-  };
-
-  localStorage.setItem(
-    "cotizapro_quotes",
-    JSON.stringify([...savedQuotes, quote])
-  );
-const updatedQuotes = [...savedQuotes, quote];
-
-localStorage.setItem(
-  "cotizapro_quotes",
-  JSON.stringify(updatedQuotes)
-);
-
-setQuotes(updatedQuotes);
-
-setFolio(
-  `COT-${String(
-    Math.max(
-      ...updatedQuotes.map(q =>
-        Number(String(q.id).replace(/\D/g, "")) || 0
-      )
-    ) + 1
-  ).padStart(6, "0")}`
-);
-
-alert(`Cotización ${folio} guardada correctamente.`);
-}
   function loadQuote(q) {
-  setFolio(q.id);
-  setClient(q.client);
-  setItems(q.items);
-  setGlobalPct(q.globalPct || 15);
-  setView("quote");
-}
+    setFolio(q.id);
+    setClient(q.client || { name: "", email: "", company: "" });
+    setItems(q.items || []);
+    setGlobalPct(q.globalPct || 15);
+    setView("quote");
+  }
+
+  function deleteQuote(id) {
+    if (!confirm(`¿Eliminar la cotización ${id}?`)) return;
+
+    const updatedQuotes = quotes.filter((q) => q.id !== id);
+    localStorage.setItem("cotizapro_quotes", JSON.stringify(updatedQuotes));
+    setQuotes(updatedQuotes);
+    setFolio(getNextFolioFromQuotes(updatedQuotes));
+  }
+
   function generatePdf() {
+    if (items.length === 0) {
+      alert("Agrega productos antes de generar PDF.");
+      return;
+    }
+
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
+
     doc.setFillColor(12, 29, 46);
     doc.rect(0, 0, pageWidth, 86, "F");
+
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.text("ASEO EMPRESARIAL", 40, 42);
+
     doc.setFontSize(10);
     doc.text("Tel. 5580013349", 40, 60);
     doc.text("Gardenias No. 50, Col. San Juan Bosco, C.P. 52946, Atizapán de Zaragoza", 40, 74);
@@ -211,6 +334,7 @@ alert(`Cotización ${folio} guardada correctamente.`);
     doc.setTextColor(20, 28, 39);
     doc.setFontSize(18);
     doc.text("COTIZACIÓN", 40, 120);
+
     doc.setFontSize(10);
     doc.text(`Número: ${folio}`, 400, 112);
     doc.text(`Fecha: ${issueDate}`, 400, 128);
@@ -218,6 +342,7 @@ alert(`Cotización ${folio} guardada correctamente.`);
 
     doc.setFontSize(11);
     doc.text("Receptor", 40, 158);
+
     doc.setFontSize(10);
     doc.text(`Empresa: ${client.company || "Sin empresa"}`, 40, 176);
     doc.text(`Contacto: ${client.name || "Sin nombre"}`, 40, 192);
@@ -226,157 +351,320 @@ alert(`Cotización ${folio} guardada correctamente.`);
     autoTable(doc, {
       startY: 232,
       head: [["Cód.", "Producto", "Cant.", "Unidad", "P. Unit.", "Importe"]],
-      body: items.map(i => [i.code, i.name, i.quantity, i.unit, money(i.unitPrice), money(i.lineTotal)]),
+      body: items.map((i) => [
+        i.code || "S/C",
+        i.name,
+        i.quantity,
+        i.unit,
+        money(i.unitPrice),
+        money(i.lineTotal),
+      ]),
       styles: { fontSize: 8, cellPadding: 5 },
       headStyles: { fillColor: [12, 29, 46] },
-      columnStyles: { 1: { cellWidth: 180 }, 5: { halign: "right" }, 6: { halign: "right" } },
+      columnStyles: {
+        1: { cellWidth: 190 },
+        4: { halign: "right" },
+        5: { halign: "right" },
+      },
     });
 
     const y = doc.lastAutoTable.finalY + 26;
+
     doc.setFontSize(11);
     doc.text(`Subtotal: ${money(subtotal)}`, 380, y);
     doc.text(`I.V.A. 16%: ${money(iva)}`, 380, y + 18);
+
     doc.setFontSize(15);
     doc.text(`Total: ${money(total)}`, 380, y + 42);
 
     doc.setFontSize(10);
     doc.text("Notas", 40, y + 72);
+
     let noteY = y + 90;
-    fixedNotes.forEach(n => {
+    fixedNotes.forEach((n) => {
       const lines = doc.splitTextToSize(`• ${n}`, 500);
       doc.text(lines, 40, noteY);
       noteY += lines.length * 12 + 3;
     });
+
     doc.save(`${folio}.pdf`);
   }
 
   return (
     <div className="app">
       <aside className="sidebar">
-        <div className="brand"><div className="mark">AE</div><div><h1>COTIZAPRO</h1><p>Aseo Empresarial</p></div></div>
-       <nav>
-  <a className={view === "quote" ? "active" : ""} onClick={() => setView("quote")}>Nueva Cotización</a>
-  <a>Catálogos</a>
-  <a>Clientes</a>
-  <a className={view === "history" ? "active" : ""} onClick={() => setView("history")}>Historial</a>
-</nav>
+        <div className="brand">
+          <div className="mark">AE</div>
+          <div>
+            <h1>COTIZAPRO</h1>
+            <p>Aseo Empresarial</p>
+          </div>
+        </div>
+
+        <nav>
+          <a className={view === "quote" ? "active" : ""} onClick={() => setView("quote")}>
+            Nueva Cotización
+          </a>
+          <a>Catálogos</a>
+          <a>Clientes</a>
+          <a className={view === "history" ? "active" : ""} onClick={() => setView("history")}>
+            Historial
+          </a>
+        </nav>
       </aside>
+
       <main className="main">
-  <h1>PRUEBA COTIZAPRO</h1>
         {view === "quote" && (
-      <>
-        <header className="topbar">
-          <div><h2>Nueva cotización</h2><p>Flujo rápido para celular y web</p></div>
-          <button className="primary" onClick={generatePdf} disabled={!items.length}><FileDown size={18}/> Generar PDF</button>
-        </header>
+          <>
+            <header className="topbar">
+              <div>
+                <h2>Nueva cotización</h2>
+                <p>Flujo rápido para celular y web</p>
+              </div>
 
-        <section className="grid">
-          <div className="card client" style={{ position: "relative", zIndex: 10 }}>
-            <h3>Datos del cliente</h3>
-            <div className="fields">
-              <label>Nombre<input value={client.name} onChange={e=>setClient({...client, name:e.target.value})} placeholder="Gabriela Flores Méndez"/></label>
-              <label>Empresa<input value={client.company} onChange={e=>setClient({...client, company:e.target.value})} placeholder="Limpia Tap"/></label>
-              <label>Correo<input value={client.email} onChange={e=>setClient({...client, email:e.target.value})} placeholder="correo@empresa.com"/></label>
-            </div>
-          </div>
-          <div className="card quoteData"><h3>Datos de cotización</h3><p><b>Folio:</b> {folio}</p><p><b>Fecha:</b> {issueDate}</p><p><b>Vence:</b> {dueDate}</p></div>
-        </section>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={newQuote}>Nueva</button>
+                <button className="primary" onClick={generatePdf} disabled={!items.length}>
+                  <FileDown size={18} /> Generar PDF
+                </button>
+              </div>
+            </header>
 
-        <section className="card">
-          <div className="catalogControls">
-            <select value={supplier} onChange={e=>setSupplier(e.target.value)}>
-              <option>GCP</option><option>Elite</option><option>Uniplas</option><option>Palmer Fixture</option><option>Chrisalim</option><option>Escorpion</option><option>Sra. Julia</option>
-            </select>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleUpload} hidden />
-            <button onClick={()=>fileRef.current.click()}><Upload size={16}/> Importar lista Excel/CSV</button>
-          </div>
-        </section>
+            <section className="grid">
+              <div className="card client" style={{ position: "relative", zIndex: 10 }}>
+                <h3>Datos del cliente</h3>
+                <div className="fields">
+                  <label>
+                    Nombre
+                    <input
+                      value={client.name}
+                      onChange={(e) => setClient({ ...client, name: e.target.value })}
+                      placeholder="Gabriela Flores Méndez"
+                    />
+                  </label>
 
-        <section className="card">
-          <div className="searchRow">
-            <div className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar por código o nombre..." /></div>
-            <label className="pct">Porcentaje general <input type="number" value={globalPct} onChange={e=>setGlobalPct(e.target.value)} />%</label>
-          </div>
-          <div className="productList">
-            {filtered.map((p, idx)=> (
-              <button key={`${p.supplier}-${p.code}-${idx}`} onClick={()=>addProduct(p)} className="product">
-                <span><b>{p.code || "S/C"}</b> · {p.name}</span>
-                <small>{p.supplier} · {p.unit} · Costo {money(p.cost)}</small>
-                <Plus size={16}/>
-              </button>
-            ))}
-          </div>
-        </section>
+                  <label>
+                    Empresa
+                    <input
+                      value={client.company}
+                      onChange={(e) => setClient({ ...client, company: e.target.value })}
+                      placeholder="Limpia Tap"
+                    />
+                  </label>
 
-        <section className="quoteLayout">
-          <div className="card itemsCard">
-            <h3>Productos agregados</h3>
-            {items.length === 0 ? <p className="empty">Agrega productos para empezar la cotización.</p> : (
-              <div className="items">
-                {items.map((item, idx)=>(
-                  <div className="item" key={idx}>
-                    <div className="itemTitle"><b>{item.code}</b> {item.name}</div>
-                    <div className="itemControls">
-                      <label>Cant.<input type="number" value={item.quantity} onChange={e=>updateItem(idx,{quantity:Number(e.target.value)||1})}/></label>
-                      <label>%<input type="number" value={item.pct} onChange={e=>updateItem(idx,{pct:Number(e.target.value)||0})}/></label>
-                      <span>{money(item.unitPrice)}</span>
-                      <strong>{money(item.lineTotal)}</strong>
-                      <button className="danger" onClick={()=>removeItem(idx)}><Trash2 size={16}/></button>
-                    </div>
-                  </div>
+                  <label>
+                    Correo
+                    <input
+                      value={client.email}
+                      onChange={(e) => setClient({ ...client, email: e.target.value })}
+                      placeholder="correo@empresa.com"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="card quoteData">
+                <h3>Datos de cotización</h3>
+                <p><b>Folio:</b> {folio}</p>
+                <p><b>Fecha:</b> {issueDate}</p>
+                <p><b>Vence:</b> {dueDate}</p>
+              </div>
+            </section>
+
+            <section className="card">
+              <div className="catalogControls">
+                <select value={supplier} onChange={(e) => setSupplier(e.target.value)}>
+                  <option>GCP</option>
+                  <option>Elite</option>
+                  <option>Uniplas</option>
+                  <option>Palmer Fixture</option>
+                  <option>Chrisalim</option>
+                  <option>Escorpion</option>
+                  <option>Sra. Julia</option>
+                </select>
+
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleUpload}
+                  hidden
+                />
+
+                <button onClick={() => fileRef.current.click()}>
+                  <Upload size={16} /> Importar lista Excel/CSV
+                </button>
+              </div>
+            </section>
+
+            <section className="card">
+              <div className="searchRow">
+                <div className="searchBox">
+                  <Search size={18} />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Buscar por código o nombre..."
+                  />
+                </div>
+
+                <label className="pct">
+                  Porcentaje general
+                  <input
+                    type="number"
+                    value={globalPct}
+                    onChange={(e) => setGlobalPct(e.target.value)}
+                  />
+                  %
+                </label>
+              </div>
+
+              <div className="productList">
+                {filtered.map((p, idx) => (
+                  <button
+                    key={`${p.supplier}-${p.code}-${idx}`}
+                    onClick={() => addProduct(p)}
+                    className="product"
+                  >
+                    <span><b>{p.code || "S/C"}</b> · {p.name}</span>
+                    <small>{p.supplier} · {p.unit} · Costo {money(p.cost)}</small>
+                    <Plus size={16} />
+                  </button>
                 ))}
               </div>
-            )}
+            </section>
+
+            <section className="quoteLayout">
+              <div className="card itemsCard">
+                <h3>Productos agregados</h3>
+
+                {items.length === 0 ? (
+                  <p className="empty">Agrega productos para empezar la cotización.</p>
+                ) : (
+                  <div className="items">
+                    {items.map((item, idx) => (
+                      <div className="item" key={idx}>
+                        <div className="itemTitle">
+                          <b>{item.code}</b> {item.name}
+                        </div>
+
+                        <div className="itemControls">
+                          <label>
+                            Cant.
+                            <input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) || 1 })}
+                            />
+                          </label>
+
+                          <label>
+                            %
+                            <input
+                              type="number"
+                              value={item.pct}
+                              onChange={(e) => updateItem(idx, { pct: Number(e.target.value) || 0 })}
+                            />
+                          </label>
+
+                          <span>{money(item.unitPrice)}</span>
+                          <strong>{money(item.lineTotal)}</strong>
+
+                          <button className="danger" onClick={() => removeItem(idx)}>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="actions">
+                  <button onClick={duplicateQuote}>
+                    <Copy size={16} /> Duplicar
+                  </button>
+
+                  <button onClick={saveQuote} disabled={!items.length}>
+                    <Save size={16} /> Guardar
+                  </button>
+                </div>
+              </div>
+
+              <div className="card summary">
+                <h3>Resumen</h3>
+
+                <p><span>Subtotal</span><b>{money(subtotal)}</b></p>
+                <p><span>IVA 16%</span><b>{money(iva)}</b></p>
+
+                <div className="total">
+                  <span>Total</span>
+                  <strong>{money(total)}</strong>
+                </div>
+
+                <button className="primary full" onClick={generatePdf} disabled={!items.length}>
+                  <FileDown size={18} /> Generar PDF
+                </button>
+              </div>
+            </section>
+          </>
+        )}
+
+        {view === "history" && (
+          <div className="card">
+            <h3>Historial de cotizaciones</h3>
+
+            <div className="searchBox" style={{ margin: "12px 0" }}>
+              <Search size={18} />
+              <input
+                value={historyQuery}
+                onChange={(e) => setHistoryQuery(e.target.value)}
+                placeholder="Buscar por folio, cliente o empresa..."
+              />
             </div>
-            <div className="actions">
-  <button onClick={duplicateQuote}>
-    <Copy size={16}/> Duplicar
-  </button>
 
-  <button onClick={saveQuote} disabled={!items.length}>
-    <Save size={16}/> Guardar
-  </button>
-</div>
-          <div className="card summary">
-            <h3>Resumen</h3>
-            <p><span>Subtotal</span><b>{money(subtotal)}</b></p>
-            <p><span>IVA 16%</span><b>{money(iva)}</b></p>
-            <div className="total"><span>Total</span><strong>{money(total)}</strong></div>
-            <button className="primary full" onClick={generatePdf} disabled={!items.length}><FileDown size={18}/> Generar PDF</button>
+            {filteredQuotes.length === 0 && (
+              <p>No hay cotizaciones guardadas</p>
+            )}
+
+            {filteredQuotes.map((q) => (
+              <div
+                key={q.id}
+                style={{
+                  borderBottom: "1px solid #eee",
+                  padding: "12px 0",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  alignItems: "center",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => loadQuote(q)}
+                  style={{
+                    background: "transparent",
+                    border: "0",
+                    textAlign: "left",
+                    width: "100%",
+                    cursor: "pointer",
+                  }}
+                >
+                  <strong>{q.id}</strong>
+                  <div>{q.client?.name || "Sin nombre"} - {q.client?.company || ""}</div>
+                  <div>Total: {money(q.total)}</div>
+                  <div>Porcentaje: {q.globalPct}%</div>
+                </button>
+
+                <button className="danger" onClick={() => deleteQuote(q.id)}>
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
           </div>
-        </section>
-               </>
-)}
-{view === "history" && (
-        <div className="card">
-          <h3>Historial de cotizaciones</h3>
-
-          {quotes.length === 0 && <p>No hay cotizaciones guardadas</p>}
-
-          {quotes.map((q) => (
-            <button
-              key={q.id}
-              type="button"
-              onClick={() => loadQuote(q)}
-              style={{
-                background: "transparent",
-                border: "0",
-                textAlign: "left",
-                width: "100%",
-                borderBottom: "1px solid #eee",
-                padding: "10px 0",
-                cursor: "pointer"
-              }}
-            >
-              <strong>{q.id}</strong>
-              <div>{q.client?.name || "Sin nombre"} - {q.client?.company || ""}</div>
-              <div>Total: {money(q.total)}</div>
-              <div>Porcentaje: {q.globalPct}%</div>
-            </button>
-          ))}
-        </div>
-      )}
-    </main>
-  </div>
-);
+        )}
+      </main>
+    </div>
+  );
 }
+
+createRoot(document.getElementById("root")).render(<App />);                     
