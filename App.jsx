@@ -84,7 +84,7 @@ useEffect(() => {
   return `COT-${String(next).padStart(6, "0")}`;
 };
 
-const [folio, setFolio] = useState(getNextFolio());
+const [folio, setFolio] = useState("COT-000001");
   const [items, setItems] = useState([]);
   useEffect(() => {
   if (products.length > 0) {
