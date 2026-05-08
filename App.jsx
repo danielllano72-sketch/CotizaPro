@@ -319,37 +319,38 @@ setQuotes([...savedQuotes, quote]);
             <button className="primary full" onClick={generatePdf} disabled={!items.length}><FileDown size={18}/> Generar PDF</button>
           </div>
         </section>
-      </>
-)}
-{view === "history" && (
-  <div className="card">
-    <h3>Historial de cotizaciones</h3>
+                </>
+      )}
 
-    {quotes.length === 0 && <p>No hay cotizaciones guardadas</p>}
+      {view === "history" && (
+        <div className="card">
+          <h3>Historial de cotizaciones</h3>
 
-    {quotes.map((q) => (
-      <button
-        key={q.id}
-        type="button"
-        onClick={() => loadQuote(q)}
-        style={{
-          background: "transparent",
-          border: "0",
-          textAlign: "left",
-          width: "100%",
-          borderBottom: "1px solid #eee",
-          padding: "10px 0",
-          cursor: "pointer"
-        }}
-      >
-        <strong>{q.id}</strong>
-        <div>{q.client?.name || "Sin nombre"} - {q.client?.company || ""}</div>
-        <div>Total: {money(q.total)}</div>
-        <div>Porcentaje: {q.globalPct}%</div>
-      </button>
-    ))}
-  </div>
-)}
+          {quotes.length === 0 && <p>No hay cotizaciones guardadas</p>}
+
+          {quotes.map((q) => (
+            <button
+              key={q.id}
+              type="button"
+              onClick={() => loadQuote(q)}
+              style={{
+                background: "transparent",
+                border: "0",
+                textAlign: "left",
+                width: "100%",
+                borderBottom: "1px solid #eee",
+                padding: "10px 0",
+                cursor: "pointer"
+              }}
+            >
+              <strong>{q.id}</strong>
+              <div>{q.client?.name || "Sin nombre"} - {q.client?.company || ""}</div>
+              <div>Total: {money(q.total)}</div>
+              <div>Porcentaje: {q.globalPct}%</div>
+            </button>
+          ))}
+        </div>
     </main>
-  );
-createRoot(document.getElementById("root")).render(<App />);
+  </div>
+);
+}
