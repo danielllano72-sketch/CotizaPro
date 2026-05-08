@@ -344,9 +344,9 @@ alert(`Cotización ${folio} guardada correctamente.`);
             <button className="primary full" onClick={generatePdf} disabled={!items.length}><FileDown size={18}/> Generar PDF</button>
           </div>
         </section>
-                </>
-      )}
-       {view === "history" && (
+               </>
+)}
+{view === "history" && (
         <div className="card">
           <h3>Historial de cotizaciones</h3>
 
