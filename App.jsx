@@ -77,7 +77,14 @@ useEffect(() => {
   const saved = JSON.parse(localStorage.getItem("cotizapro_quotes")) || [];
   setQuotes(saved);
 }, []);
-  const [folio, setFolio] = useState("COT-000001");
+  const getNextFolio = () => {
+  const savedQuotes = JSON.parse(localStorage.getItem("cotizapro_quotes")) || [];
+  const nums = savedQuotes.map(q => Number(String(q.id).replace(/\D/g, "")) || 0);
+  const next = Math.max(0, ...nums) + 1;
+  return `COT-${String(next).padStart(6, "0")}`;
+};
+
+const [folio, setFolio] = useState(getNextFolio());
   const [items, setItems] = useState([]);
   useEffect(() => {
   if (products.length > 0) {
@@ -161,8 +168,26 @@ function saveQuote() {
     "cotizapro_quotes",
     JSON.stringify([...savedQuotes, quote])
   );
-setQuotes([...savedQuotes, quote]);
-  alert(`Cotización ${folio} guardada correctamente.`);
+const updatedQuotes = [...savedQuotes, quote];
+
+localStorage.setItem(
+  "cotizapro_quotes",
+  JSON.stringify(updatedQuotes)
+);
+
+setQuotes(updatedQuotes);
+
+setFolio(
+  `COT-${String(
+    Math.max(
+      ...updatedQuotes.map(q =>
+        Number(String(q.id).replace(/\D/g, "")) || 0
+      )
+    ) + 1
+  ).padStart(6, "0")}`
+);
+
+alert(`Cotización ${folio} guardada correctamente.`);
 }
   function loadQuote(q) {
   setFolio(q.id);
