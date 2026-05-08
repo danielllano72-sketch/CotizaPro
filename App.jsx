@@ -262,6 +262,7 @@ alert(`Cotización ${folio} guardada correctamente.`);
 </nav>
       </aside>
       <main className="main">
+  <h1>PRUEBA COTIZAPRO</h1>
         {view === "quote" && (
       <>
         <header className="topbar">
