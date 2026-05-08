@@ -321,8 +321,7 @@ setQuotes([...savedQuotes, quote]);
         </section>
                 </>
       )}
-
-      {view === "history" && (
+       {view === "history" && (
         <div className="card">
           <h3>Historial de cotizaciones</h3>
 
@@ -350,6 +349,7 @@ setQuotes([...savedQuotes, quote]);
             </button>
           ))}
         </div>
+      )}
     </main>
   </div>
 );
