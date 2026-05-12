@@ -120,6 +120,7 @@ function App() {
   const [query, setQuery] = useState("");
   const [historyQuery, setHistoryQuery] = useState("");
   const [clientQuery, setClientQuery] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState(null);
   const [globalPct, setGlobalPct] = useState(15);
   const [client, setClient] = useState({ name: "", email: "", company: "" });
   const [view, setView] = useState("quote");
@@ -375,7 +376,16 @@ function App() {
     setQuotes(updatedQuotes);
     setFolio(getNextFolioFromQuotes(updatedQuotes));
   }
-
+function getClientQuotes(c) {
+  return quotes.filter((q) => {
+    const qc = q.client || {};
+    return (
+      (c.email && qc.email && c.email.toLowerCase() === qc.email.toLowerCase()) ||
+      (c.company && qc.company && c.company.toLowerCase() === qc.company.toLowerCase()) ||
+      (c.name && qc.name && c.name.toLowerCase() === qc.name.toLowerCase())
+    );
+  });
+}
   function generatePdf() {
     if (items.length === 0) {
       alert("Agrega productos antes de generar PDF.");
@@ -643,45 +653,103 @@ function App() {
         )}
 
         {view === "clients" && (
-          <div className="card">
-            <h3>Clientes registrados</h3>
+  <div className="card">
+    <h3>Clientes registrados</h3>
 
-            <div className="searchBox" style={{ margin: "12px 0" }}>
-              <Search size={18} />
-              <input value={clientQuery} onChange={(e) => setClientQuery(e.target.value)} placeholder="Buscar por nombre, empresa o correo..." />
+    <div className="searchBox" style={{ margin: "12px 0" }}>
+      <Search size={18} />
+      <input
+        value={clientQuery}
+        onChange={(e) => setClientQuery(e.target.value)}
+        placeholder="Buscar por nombre, empresa o correo..."
+      />
+    </div>
+
+    {filteredClients.length === 0 && <p>No hay clientes registrados</p>}
+
+    {filteredClients.map((c) => {
+      const clientQuotes = getClientQuotes(c);
+      const isOpen = selectedClientId === c.id;
+
+      return (
+        <div
+          key={c.id}
+          style={{
+            borderBottom: "1px solid #eee",
+            padding: "12px 0",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setSelectedClientId(isOpen ? null : c.id)}
+              style={{
+                background: "transparent",
+                border: "0",
+                textAlign: "left",
+                width: "100%",
+                cursor: "pointer",
+              }}
+            >
+              <strong>{c.company || "Sin empresa"}</strong>
+              <div>{c.name || "Sin nombre"}</div>
+              <div>{c.email || "Sin correo"}</div>
+              <small>{clientQuotes.length} cotización(es)</small>
+            </button>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => useClient(c)}>Usar</button>
+              <button className="danger" onClick={() => deleteClient(c.id)}>
+                <Trash2 size={16} />
+              </button>
             </div>
-
-            {filteredClients.length === 0 && <p>No hay clientes registrados</p>}
-
-            {filteredClients.map((c) => (
-              <div
-                key={c.id}
-                style={{
-                  borderBottom: "1px solid #eee",
-                  padding: "12px 0",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 12,
-                }}
-              >
-                <div>
-                  <strong>{c.company || "Sin empresa"}</strong>
-                  <div>{c.name || "Sin nombre"}</div>
-                  <div>{c.email || "Sin correo"}</div>
-                </div>
-
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => useClient(c)}>Usar</button>
-                  <button className="danger" onClick={() => deleteClient(c.id)}>
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
           </div>
-        )}
 
+          {isOpen && (
+            <div style={{ marginTop: 12, paddingLeft: 16 }}>
+              <h4>Cotizaciones realizadas</h4>
+
+              {clientQuotes.length === 0 && (
+                <p>No hay cotizaciones para este cliente.</p>
+              )}
+
+              {clientQuotes.map((q) => (
+                <button
+                  key={q.id}
+                  type="button"
+                  onClick={() => loadQuote(q)}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    background: "#f8fafc",
+                    border: "1px solid #eee",
+                    borderRadius: 10,
+                    padding: 10,
+                    marginBottom: 8,
+                    textAlign: "left",
+                    cursor: "pointer",
+                  }}
+                >
+                  <strong>{q.id}</strong>
+                  <div>Total: {money(q.total)}</div>
+                  <div>Fecha: {q.issueDate || "Sin fecha"}</div>
+                  <div>Porcentaje: {q.globalPct}%</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    })}
+  </div>
+)}
         {view === "history" && (
           <div className="card">
             <h3>Historial de cotizaciones</h3>
