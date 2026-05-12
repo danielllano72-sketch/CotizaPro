@@ -22,11 +22,6 @@ const initialProducts = [
   { supplier: "Sra. Julia", code: "QASEM002", name: "Jabón Gel Asempre p/manos Almendras", unit: "Litro", cost: 10 },
   { supplier: "Sra. Julia", code: "MQ0211", name: "Multiusos Asempre Lavanda", unit: "Litro", cost: 5 },
   { supplier: "Sra. Julia", code: "QASEM013", name: "Cloro Asempre al 6%", unit: "Litro", cost: 6 },
-  { supplier: "Chrisalim", code: "WIE001", name: "Pastilla Media Luna Wiese 70 grs", unit: "Pieza", cost: 10.70 },
-  { supplier: "Chrisalim", code: "P-96", name: "Fibra Verde Scotch Brite", unit: "Pieza", cost: 12.50 },
-  { supplier: "Chrisalim", code: "P-76", name: "Fibra Negra Scotch Brite", unit: "Pieza", cost: 16.73 },
-  { supplier: "Uniplas", code: "BNR6090", name: "Bolsa negra en rollo 60x90 cm", unit: "Kilo", cost: 42 },
-  { supplier: "Uniplas", code: "BNR90120", name: "Bolsa negra en rollo 90x1.20", unit: "Kilo", cost: 42 },
 ];
 
 function safeParse(value, fallback) {
@@ -58,23 +53,17 @@ function normalizeRow(row, supplier = "Importado") {
     ])
   );
 
-  const code = keys.codigo || keys.cod || keys.clave || keys.sku || keys["codigo sap"] || "";
-  const name = keys.producto || keys.descripcion || keys.description || keys.nombre || keys.articulo || "";
-  const unit = keys.unidad || keys.unit || "Pieza";
-  const cost = parseNumber(keys.precio || keys.costo || keys["precio unitario"] || keys["costo compra"] || keys.cost);
-
   return {
     supplier,
-    code: String(code || ""),
-    name: String(name || ""),
-    unit: String(unit || "Pieza"),
-    cost,
+    code: String(keys.codigo || keys.cod || keys.clave || keys.sku || ""),
+    name: String(keys.producto || keys.descripcion || keys.nombre || keys.articulo || ""),
+    unit: String(keys.unidad || keys.unit || "Pieza"),
+    cost: parseNumber(keys.precio || keys.costo || keys["precio unitario"] || keys["costo compra"]),
   };
 }
 
 function quotedPrice(cost, pct) {
-  const p = Number(pct || 0);
-  const divisor = 1 - p / 100;
+  const divisor = 1 - Number(pct || 0) / 100;
   if (divisor <= 0) return 0;
   return Math.round((Number(cost || 0) / divisor) * 100) / 100;
 }
@@ -99,8 +88,7 @@ function makeFolio(num) {
 
 function getNextFolioFromQuotes(quotes) {
   const nums = quotes.map((q) => getNumberFromFolio(q.id));
-  const next = Math.max(0, ...nums) + 1;
-  return makeFolio(next);
+  return makeFolio(Math.max(0, ...nums) + 1);
 }
 
 function fixDuplicateFolios(quotes) {
@@ -109,9 +97,7 @@ function fixDuplicateFolios(quotes) {
   return quotes.map((q, index) => {
     let id = q.id || makeFolio(index + 1);
 
-    if (used.has(id)) {
-      id = makeFolio(index + 1);
-    }
+    if (used.has(id)) id = makeFolio(index + 1);
 
     while (used.has(id)) {
       id = makeFolio(getNumberFromFolio(id) + 1);
@@ -133,10 +119,12 @@ function App() {
   const [supplier, setSupplier] = useState("GCP");
   const [query, setQuery] = useState("");
   const [historyQuery, setHistoryQuery] = useState("");
+  const [clientQuery, setClientQuery] = useState("");
   const [globalPct, setGlobalPct] = useState(15);
   const [client, setClient] = useState({ name: "", email: "", company: "" });
   const [view, setView] = useState("quote");
   const [quotes, setQuotes] = useState([]);
+  const [clients, setClients] = useState([]);
   const [folio, setFolio] = useState("COT-000001");
   const [items, setItems] = useState([]);
   const [issueDate] = useState(todayISO());
@@ -145,15 +133,23 @@ function App() {
   useEffect(() => {
     const saved = safeParse(localStorage.getItem("cotizapro_quotes"), []);
     const fixed = fixDuplicateFolios(Array.isArray(saved) ? saved : []);
-
     localStorage.setItem("cotizapro_quotes", JSON.stringify(fixed));
     setQuotes(fixed);
     setFolio(getNextFolioFromQuotes(fixed));
   }, []);
 
   useEffect(() => {
+    const savedClients = safeParse(localStorage.getItem("cotizapro_clients"), []);
+    setClients(Array.isArray(savedClients) ? savedClients : []);
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem("cotizapro_products", JSON.stringify(products));
   }, [products]);
+
+  useEffect(() => {
+    localStorage.setItem("cotizapro_clients", JSON.stringify(clients));
+  }, [clients]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -174,10 +170,17 @@ function App() {
     });
   }, [quotes, historyQuery]);
 
-  const subtotal = useMemo(() => {
-    return items.reduce((s, i) => s + Number(i.lineTotal || 0), 0);
-  }, [items]);
+  const filteredClients = useMemo(() => {
+    const q = clientQuery.toLowerCase().trim();
+    if (!q) return clients;
 
+    return clients.filter((c) => {
+      const text = `${c.name || ""} ${c.company || ""} ${c.email || ""}`.toLowerCase();
+      return text.includes(q);
+    });
+  }, [clients, clientQuery]);
+
+  const subtotal = useMemo(() => items.reduce((s, i) => s + Number(i.lineTotal || 0), 0), [items]);
   const iva = Math.round(subtotal * IVA_RATE * 100) / 100;
   const total = Math.round((subtotal + iva) * 100) / 100;
 
@@ -251,6 +254,50 @@ function App() {
     alert("Cotización duplicada como nueva.");
   }
 
+  function saveClient() {
+    if (!client.name && !client.company) {
+      alert("Agrega nombre o empresa del cliente.");
+      return;
+    }
+
+    const exists = clients.some(
+      (c) =>
+        c.email &&
+        client.email &&
+        c.email.toLowerCase() === client.email.toLowerCase()
+    );
+
+    if (exists) {
+      alert("Ese cliente ya existe por correo.");
+      return;
+    }
+
+    const newClient = {
+      id: `CLI-${Date.now()}`,
+      name: client.name,
+      company: client.company,
+      email: client.email,
+      createdAt: new Date().toISOString(),
+    };
+
+    setClients([...clients, newClient]);
+    alert("Cliente guardado correctamente.");
+  }
+
+  function useClient(c) {
+    setClient({
+      name: c.name || "",
+      company: c.company || "",
+      email: c.email || "",
+    });
+    setView("quote");
+  }
+
+  function deleteClient(id) {
+    if (!confirm("¿Eliminar este cliente?")) return;
+    setClients(clients.filter((c) => c.id !== id));
+  }
+
   function saveQuote() {
     if (!client.name && !client.company) {
       alert("Agrega al menos nombre o empresa del cliente.");
@@ -289,8 +336,26 @@ function App() {
     localStorage.setItem("cotizapro_quotes", JSON.stringify(updatedQuotes));
     setQuotes(updatedQuotes);
 
-    alert(`Cotización ${finalFolio} guardada correctamente.`);
+    const clientExists = clients.some(
+      (c) =>
+        (client.email && c.email?.toLowerCase() === client.email.toLowerCase()) ||
+        (client.company && c.company?.toLowerCase() === client.company.toLowerCase())
+    );
 
+    if (!clientExists && (client.name || client.company)) {
+      setClients([
+        ...clients,
+        {
+          id: `CLI-${Date.now()}`,
+          name: client.name,
+          company: client.company,
+          email: client.email,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    }
+
+    alert(`Cotización ${finalFolio} guardada correctamente.`);
     setFolio(getNextFolioFromQuotes(updatedQuotes));
   }
 
@@ -406,7 +471,9 @@ function App() {
             Nueva Cotización
           </a>
           <a>Catálogos</a>
-          <a>Clientes</a>
+          <a className={view === "clients" ? "active" : ""} onClick={() => setView("clients")}>
+            Clientes
+          </a>
           <a className={view === "history" ? "active" : ""} onClick={() => setView("history")}>
             Historial
           </a>
@@ -433,34 +500,27 @@ function App() {
             <section className="grid">
               <div className="card client" style={{ position: "relative", zIndex: 10 }}>
                 <h3>Datos del cliente</h3>
+
                 <div className="fields">
                   <label>
                     Nombre
-                    <input
-                      value={client.name}
-                      onChange={(e) => setClient({ ...client, name: e.target.value })}
-                      placeholder="Gabriela Flores Méndez"
-                    />
+                    <input value={client.name} onChange={(e) => setClient({ ...client, name: e.target.value })} placeholder="Nombre del contacto" />
                   </label>
 
                   <label>
                     Empresa
-                    <input
-                      value={client.company}
-                      onChange={(e) => setClient({ ...client, company: e.target.value })}
-                      placeholder="Limpia Tap"
-                    />
+                    <input value={client.company} onChange={(e) => setClient({ ...client, company: e.target.value })} placeholder="Empresa" />
                   </label>
 
                   <label>
                     Correo
-                    <input
-                      value={client.email}
-                      onChange={(e) => setClient({ ...client, email: e.target.value })}
-                      placeholder="correo@empresa.com"
-                    />
+                    <input value={client.email} onChange={(e) => setClient({ ...client, email: e.target.value })} placeholder="correo@empresa.com" />
                   </label>
                 </div>
+
+                <button onClick={saveClient} style={{ marginTop: 12 }}>
+                  <Save size={16} /> Guardar cliente
+                </button>
               </div>
 
               <div className="card quoteData">
@@ -483,13 +543,7 @@ function App() {
                   <option>Sra. Julia</option>
                 </select>
 
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={handleUpload}
-                  hidden
-                />
+                <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleUpload} hidden />
 
                 <button onClick={() => fileRef.current.click()}>
                   <Upload size={16} /> Importar lista Excel/CSV
@@ -501,31 +555,19 @@ function App() {
               <div className="searchRow">
                 <div className="searchBox">
                   <Search size={18} />
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Buscar por código o nombre..."
-                  />
+                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por código o nombre..." />
                 </div>
 
                 <label className="pct">
                   Porcentaje general
-                  <input
-                    type="number"
-                    value={globalPct}
-                    onChange={(e) => setGlobalPct(e.target.value)}
-                  />
+                  <input type="number" value={globalPct} onChange={(e) => setGlobalPct(e.target.value)} />
                   %
                 </label>
               </div>
 
               <div className="productList">
                 {filtered.map((p, idx) => (
-                  <button
-                    key={`${p.supplier}-${p.code}-${idx}`}
-                    onClick={() => addProduct(p)}
-                    className="product"
-                  >
+                  <button key={`${p.supplier}-${p.code}-${idx}`} onClick={() => addProduct(p)} className="product">
                     <span><b>{p.code || "S/C"}</b> · {p.name}</span>
                     <small>{p.supplier} · {p.unit} · Costo {money(p.cost)}</small>
                     <Plus size={16} />
@@ -551,20 +593,12 @@ function App() {
                         <div className="itemControls">
                           <label>
                             Cant.
-                            <input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) || 1 })}
-                            />
+                            <input type="number" value={item.quantity} onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) || 1 })} />
                           </label>
 
                           <label>
                             %
-                            <input
-                              type="number"
-                              value={item.pct}
-                              onChange={(e) => updateItem(idx, { pct: Number(e.target.value) || 0 })}
-                            />
+                            <input type="number" value={item.pct} onChange={(e) => updateItem(idx, { pct: Number(e.target.value) || 0 })} />
                           </label>
 
                           <span>{money(item.unitPrice)}</span>
@@ -592,7 +626,6 @@ function App() {
 
               <div className="card summary">
                 <h3>Resumen</h3>
-
                 <p><span>Subtotal</span><b>{money(subtotal)}</b></p>
                 <p><span>IVA 16%</span><b>{money(iva)}</b></p>
 
@@ -609,22 +642,56 @@ function App() {
           </>
         )}
 
+        {view === "clients" && (
+          <div className="card">
+            <h3>Clientes registrados</h3>
+
+            <div className="searchBox" style={{ margin: "12px 0" }}>
+              <Search size={18} />
+              <input value={clientQuery} onChange={(e) => setClientQuery(e.target.value)} placeholder="Buscar por nombre, empresa o correo..." />
+            </div>
+
+            {filteredClients.length === 0 && <p>No hay clientes registrados</p>}
+
+            {filteredClients.map((c) => (
+              <div
+                key={c.id}
+                style={{
+                  borderBottom: "1px solid #eee",
+                  padding: "12px 0",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <strong>{c.company || "Sin empresa"}</strong>
+                  <div>{c.name || "Sin nombre"}</div>
+                  <div>{c.email || "Sin correo"}</div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => useClient(c)}>Usar</button>
+                  <button className="danger" onClick={() => deleteClient(c.id)}>
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {view === "history" && (
           <div className="card">
             <h3>Historial de cotizaciones</h3>
 
             <div className="searchBox" style={{ margin: "12px 0" }}>
               <Search size={18} />
-              <input
-                value={historyQuery}
-                onChange={(e) => setHistoryQuery(e.target.value)}
-                placeholder="Buscar por folio, cliente o empresa..."
-              />
+              <input value={historyQuery} onChange={(e) => setHistoryQuery(e.target.value)} placeholder="Buscar por folio, cliente o empresa..." />
             </div>
 
-            {filteredQuotes.length === 0 && (
-              <p>No hay cotizaciones guardadas</p>
-            )}
+            {filteredQuotes.length === 0 && <p>No hay cotizaciones guardadas</p>}
 
             {filteredQuotes.map((q) => (
               <div
@@ -667,4 +734,4 @@ function App() {
   );
 }
 
-createRoot(document.getElementById("root")).render(<App />);                     
+createRoot(document.getElementById("root")).render(<App />);
