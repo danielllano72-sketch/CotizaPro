@@ -5,6 +5,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Search, Upload, Plus, Trash2, FileDown, Copy, Save } from "lucide-react";
 import "./style.css";
+import { supabase } from "./supabase";
 
 const IVA_RATE = 0.16;
 
@@ -130,6 +131,11 @@ function App() {
   const [items, setItems] = useState([]);
   const [issueDate] = useState(todayISO());
   const [dueDate] = useState(plusDaysISO(7));
+  const [session, setSession] = useState(null);
+const [authEmail, setAuthEmail] = useState("");
+const [authPassword, setAuthPassword] = useState("");
+const [authMode, setAuthMode] = useState("login");
+const [authError, setAuthError] = useState("");
 
   useEffect(() => {
     const saved = safeParse(localStorage.getItem("cotizapro_quotes"), []);
@@ -143,6 +149,19 @@ function App() {
     const savedClients = safeParse(localStorage.getItem("cotizapro_clients"), []);
     setClients(Array.isArray(savedClients) ? savedClients : []);
   }, []);
+  useEffect(() => {
+  supabase.auth.getSession().then(({ data }) => {
+    setSession(data.session);
+  });
+
+  const {
+    data: { subscription }
+  } = supabase.auth.onAuthStateChange((_event, session) => {
+    setSession(session);
+  });
+
+  return () => subscription.unsubscribe();
+}, []);
 
   useEffect(() => {
     localStorage.setItem("cotizapro_products", JSON.stringify(products));
@@ -386,6 +405,31 @@ function getClientQuotes(c) {
     );
   });
 }
+  async function signIn() {
+  setAuthError("");
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email: authEmail,
+    password: authPassword
+  });
+
+  if (error) setAuthError(error.message);
+}
+
+async function signUp() {
+  setAuthError("");
+
+  const { error } = await supabase.auth.signUp({
+    email: authEmail,
+    password: authPassword
+  });
+
+  if (error) setAuthError(error.message);
+}
+
+async function signOut() {
+  await supabase.auth.signOut();
+}
   function generatePdf() {
     if (items.length === 0) {
       alert("Agrega productos antes de generar PDF.");
@@ -464,7 +508,111 @@ function getClientQuotes(c) {
 
     doc.save(`${folio}.pdf`);
   }
+if (!session) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        background: "#f4f6f8",
+        padding: 20
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 400,
+          background: "#fff",
+          padding: 32,
+          borderRadius: 18,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.08)"
+        }}
+      >
+        <h1 style={{ marginBottom: 8 }}>COTIZAPRO</h1>
 
+        <p style={{ color: "#666", marginBottom: 24 }}>
+          Acceso privado
+        </p>
+
+        <input
+          type="email"
+          placeholder="Correo"
+          value={authEmail}
+          onChange={(e) => setAuthEmail(e.target.value)}
+          style={{
+            width: "100%",
+            padding: 12,
+            marginBottom: 12,
+            borderRadius: 10,
+            border: "1px solid #ddd"
+          }}
+        />
+
+        <input
+          type="password"
+          placeholder="Contraseña"
+          value={authPassword}
+          onChange={(e) => setAuthPassword(e.target.value)}
+          style={{
+            width: "100%",
+            padding: 12,
+            marginBottom: 12,
+            borderRadius: 10,
+            border: "1px solid #ddd"
+          }}
+        />
+
+        {authError && (
+          <p style={{ color: "red", marginBottom: 12 }}>
+            {authError}
+          </p>
+        )}
+
+        <button
+          onClick={authMode === "login" ? signIn : signUp}
+          style={{
+            width: "100%",
+            padding: 12,
+            borderRadius: 10,
+            border: "none",
+            background: "#0c1d2e",
+            color: "#fff",
+            fontWeight: "bold",
+            cursor: "pointer"
+          }}
+        >
+          {authMode === "login"
+            ? "Iniciar sesión"
+            : "Crear cuenta"}
+        </button>
+
+        <button
+          onClick={() =>
+            setAuthMode(
+              authMode === "login" ? "signup" : "login"
+            )
+          }
+          style={{
+            width: "100%",
+            padding: 12,
+            borderRadius: 10,
+            border: "none",
+            background: "transparent",
+            marginTop: 10,
+            cursor: "pointer"
+          }}
+        >
+          {authMode === "login"
+            ? "Crear usuario"
+            : "Ya tengo cuenta"}
+        </button>
+      </div>
+    </div>
+  );
+}
+  
   return (
     <div className="app">
       <aside className="sidebar">
@@ -487,6 +635,15 @@ function getClientQuotes(c) {
           <a className={view === "history" ? "active" : ""} onClick={() => setView("history")}>
             Historial
           </a>
+          <button
+  onClick={signOut}
+  style={{
+    marginTop: 20,
+    width: "100%"
+  }}
+>
+  Cerrar sesión
+</button>
         </nav>
       </aside>
 
