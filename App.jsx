@@ -392,7 +392,6 @@ function duplicateQuote() {
 
   setClients(clients.filter((c) => c.id !== id));
 }
-
 async function saveQuote() {
   if (!client.name && !client.company) {
     alert("Agrega al menos nombre o empresa del cliente.");
@@ -477,7 +476,6 @@ async function saveQuote() {
   alert(`Cotización ${finalFolio} guardada correctamente.`);
   setFolio(getNextFolioFromQuotes(updatedQuotes));
 }
-
   function loadQuote(q) {
     setFolio(q.id);
     setClient(q.client || { name: "", email: "", company: "" });
