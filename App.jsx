@@ -138,17 +138,52 @@ const [authMode, setAuthMode] = useState("login");
 const [authError, setAuthError] = useState("");
 
   useEffect(() => {
-    const saved = safeParse(localStorage.getItem("cotizapro_quotes"), []);
-    const fixed = fixDuplicateFolios(Array.isArray(saved) ? saved : []);
-    localStorage.setItem("cotizapro_quotes", JSON.stringify(fixed));
-    setQuotes(fixed);
-    setFolio(getNextFolioFromQuotes(fixed));
-  }, []);
+  async function loadData() {
+    const { data: quotesData, error: quotesError } = await supabase
+      .from("quotes")
+      .select("*")
+      .order("created_at", { ascending: true });
 
-  useEffect(() => {
-    const savedClients = safeParse(localStorage.getItem("cotizapro_clients"), []);
-    setClients(Array.isArray(savedClients) ? savedClients : []);
-  }, []);
+    if (!quotesError) {
+      const fixedQuotes = fixDuplicateFolios(
+        (quotesData || []).map((q) => ({
+          id: q.id,
+          client: q.client || {},
+          items: q.items || [],
+          subtotal: q.subtotal,
+          iva: q.iva,
+          total: q.total,
+          globalPct: q.globalpct ?? 15,
+          issueDate: q.issuedate,
+          dueDate: q.duedate,
+          createdAt: q.created_at,
+        }))
+      );
+
+      setQuotes(fixedQuotes);
+      setFolio(getNextFolioFromQuotes(fixedQuotes));
+    }
+
+    const { data: clientsData, error: clientsError } = await supabase
+      .from("clients")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (!clientsError) {
+      setClients(
+        (clientsData || []).map((c) => ({
+          id: c.id,
+          name: c.name || "",
+          company: c.company || "",
+          email: c.email || "",
+          createdAt: c.created_at,
+        }))
+      );
+    }
+  }
+
+  loadData();
+}, []);
   useEffect(() => {
   supabase.auth.getSession().then(({ data }) => {
     setSession(data.session);
@@ -166,10 +201,6 @@ const [authError, setAuthError] = useState("");
   useEffect(() => {
     localStorage.setItem("cotizapro_products", JSON.stringify(products));
   }, [products]);
-
-  useEffect(() => {
-    localStorage.setItem("cotizapro_clients", JSON.stringify(clients));
-  }, [clients]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -260,25 +291,61 @@ const [authError, setAuthError] = useState("");
   }
 
   function newQuote() {
-    const savedQuotes = safeParse(localStorage.getItem("cotizapro_quotes"), []);
-    setFolio(getNextFolioFromQuotes(Array.isArray(savedQuotes) ? savedQuotes : []));
-    setClient({ name: "", email: "", company: "" });
-    setItems([]);
-    setGlobalPct(15);
-    setView("quote");
+  setFolio(getNextFolioFromQuotes(quotes));
+  setClient({ name: "", email: "", company: "" });
+  setItems([]);
+  setGlobalPct(15);
+  setView("quote");
+}
+
+function duplicateQuote() {
+  setFolio(getNextFolioFromQuotes(quotes));
+  alert("Cotización duplicada como nueva.");
+}
+  async function saveClient() {
+  if (!client.name && !client.company) {
+    alert("Agrega nombre o empresa del cliente.");
+    return;
   }
 
-  function duplicateQuote() {
-    const savedQuotes = safeParse(localStorage.getItem("cotizapro_quotes"), []);
-    setFolio(getNextFolioFromQuotes(Array.isArray(savedQuotes) ? savedQuotes : []));
-    alert("Cotización duplicada como nueva.");
+  const exists = clients.some(
+    (c) =>
+      c.email &&
+      client.email &&
+      c.email.toLowerCase() === client.email.toLowerCase()
+  );
+
+  if (exists) {
+    alert("Ese cliente ya existe por correo.");
+    return;
   }
 
-  function saveClient() {
-    if (!client.name && !client.company) {
-      alert("Agrega nombre o empresa del cliente.");
-      return;
-    }
+  const { data, error } = await supabase
+    .from("clients")
+    .insert({
+      name: client.name,
+      company: client.company,
+      email: client.email,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    alert("Error al guardar cliente: " + error.message);
+    return;
+  }
+
+  const newClient = {
+    id: data.id,
+    name: data.name || "",
+    company: data.company || "",
+    email: data.email || "",
+    createdAt: data.created_at,
+  };
+
+  setClients([...clients, newClient]);
+  alert("Cliente guardado correctamente.");
+}
 
     const exists = clients.some(
       (c) =>
@@ -313,43 +380,103 @@ const [authError, setAuthError] = useState("");
     setView("quote");
   }
 
-  function deleteClient(id) {
-    if (!confirm("¿Eliminar este cliente?")) return;
-    setClients(clients.filter((c) => c.id !== id));
+  async function deleteClient(id) {
+  if (!confirm("¿Eliminar este cliente?")) return;
+
+  const { error } = await supabase.from("clients").delete().eq("id", id);
+
+  if (error) {
+    alert("Error al eliminar cliente: " + error.message);
+    return;
   }
 
-  function saveQuote() {
-    if (!client.name && !client.company) {
-      alert("Agrega al menos nombre o empresa del cliente.");
-      return;
+  setClients(clients.filter((c) => c.id !== id));
+}
+
+  async function saveQuote() {
+  if (!client.name && !client.company) {
+    alert("Agrega al menos nombre o empresa del cliente.");
+    return;
+  }
+
+  if (items.length === 0) {
+    alert("Agrega productos antes de guardar.");
+    return;
+  }
+
+  let finalFolio = folio;
+
+  if (quotes.some((q) => q.id === finalFolio)) {
+    finalFolio = getNextFolioFromQuotes(quotes);
+  }
+
+  const quote = {
+    id: finalFolio,
+    client,
+    issueDate,
+    dueDate,
+    items,
+    subtotal,
+    iva,
+    total,
+    globalPct,
+    createdAt: new Date().toISOString(),
+  };
+
+  const { error } = await supabase.from("quotes").upsert({
+    id: finalFolio,
+    client,
+    items,
+    subtotal,
+    iva,
+    total,
+    globalpct: globalPct,
+    issuedate: issueDate,
+    duedate: dueDate,
+  });
+
+  if (error) {
+    alert("Error al guardar cotización: " + error.message);
+    return;
+  }
+
+  const updatedQuotes = fixDuplicateFolios([...quotes, quote]);
+  setQuotes(updatedQuotes);
+
+  const clientExists = clients.some(
+    (c) =>
+      (client.email && c.email?.toLowerCase() === client.email.toLowerCase()) ||
+      (client.company && c.company?.toLowerCase() === client.company.toLowerCase())
+  );
+
+  if (!clientExists && (client.name || client.company)) {
+    const { data: newClientData } = await supabase
+      .from("clients")
+      .insert({
+        name: client.name,
+        company: client.company,
+        email: client.email,
+      })
+      .select()
+      .single();
+
+    if (newClientData) {
+      setClients([
+        ...clients,
+        {
+          id: newClientData.id,
+          name: newClientData.name || "",
+          company: newClientData.company || "",
+          email: newClientData.email || "",
+          createdAt: newClientData.created_at,
+        },
+      ]);
     }
+  }
 
-    if (items.length === 0) {
-      alert("Agrega productos antes de guardar.");
-      return;
-    }
-
-    const savedQuotesRaw = safeParse(localStorage.getItem("cotizapro_quotes"), []);
-    const savedQuotes = Array.isArray(savedQuotesRaw) ? fixDuplicateFolios(savedQuotesRaw) : [];
-
-    let finalFolio = folio;
-
-    if (savedQuotes.some((q) => q.id === finalFolio)) {
-      finalFolio = getNextFolioFromQuotes(savedQuotes);
-    }
-
-    const quote = {
-      id: finalFolio,
-      client,
-      issueDate,
-      dueDate,
-      items,
-      subtotal,
-      iva,
-      total,
-      globalPct,
-      createdAt: new Date().toISOString(),
-    };
+  alert(`Cotización ${finalFolio} guardada correctamente.`);
+  setFolio(getNextFolioFromQuotes(updatedQuotes));
+}
 
     const updatedQuotes = fixDuplicateFolios([...savedQuotes, quote]);
 
@@ -387,14 +514,20 @@ const [authError, setAuthError] = useState("");
     setView("quote");
   }
 
-  function deleteQuote(id) {
-    if (!confirm(`¿Eliminar la cotización ${id}?`)) return;
+  async function deleteQuote(id) {
+  if (!confirm(`¿Eliminar la cotización ${id}?`)) return;
 
-    const updatedQuotes = quotes.filter((q) => q.id !== id);
-    localStorage.setItem("cotizapro_quotes", JSON.stringify(updatedQuotes));
-    setQuotes(updatedQuotes);
-    setFolio(getNextFolioFromQuotes(updatedQuotes));
+  const { error } = await supabase.from("quotes").delete().eq("id", id);
+
+  if (error) {
+    alert("Error al eliminar cotización: " + error.message);
+    return;
   }
+
+  const updatedQuotes = quotes.filter((q) => q.id !== id);
+  setQuotes(updatedQuotes);
+  setFolio(getNextFolioFromQuotes(updatedQuotes));
+}
 function getClientQuotes(c) {
   return quotes.filter((q) => {
     const qc = q.client || {};
