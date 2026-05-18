@@ -393,7 +393,7 @@ function duplicateQuote() {
   setClients(clients.filter((c) => c.id !== id));
 }
 
-  async function saveQuote() {
+async function saveQuote() {
   if (!client.name && !client.company) {
     alert("Agrega al menos nombre o empresa del cliente.");
     return;
@@ -477,34 +477,6 @@ function duplicateQuote() {
   alert(`Cotización ${finalFolio} guardada correctamente.`);
   setFolio(getNextFolioFromQuotes(updatedQuotes));
 }
-
-    const updatedQuotes = fixDuplicateFolios([...savedQuotes, quote]);
-
-    localStorage.setItem("cotizapro_quotes", JSON.stringify(updatedQuotes));
-    setQuotes(updatedQuotes);
-
-    const clientExists = clients.some(
-      (c) =>
-        (client.email && c.email?.toLowerCase() === client.email.toLowerCase()) ||
-        (client.company && c.company?.toLowerCase() === client.company.toLowerCase())
-    );
-
-    if (!clientExists && (client.name || client.company)) {
-      setClients([
-        ...clients,
-        {
-          id: `CLI-${Date.now()}`,
-          name: client.name,
-          company: client.company,
-          email: client.email,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    }
-
-    alert(`Cotización ${finalFolio} guardada correctamente.`);
-    setFolio(getNextFolioFromQuotes(updatedQuotes));
-  }
 
   function loadQuote(q) {
     setFolio(q.id);
