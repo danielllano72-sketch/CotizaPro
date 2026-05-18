@@ -302,7 +302,8 @@ function duplicateQuote() {
   setFolio(getNextFolioFromQuotes(quotes));
   alert("Cotización duplicada como nueva.");
 }
-  async function saveClient() {
+
+async function saveClient() {
   if (!client.name && !client.company) {
     alert("Agrega nombre o empresa del cliente.");
     return;
@@ -335,42 +336,19 @@ function duplicateQuote() {
     return;
   }
 
-  const newClient = {
-    id: data.id,
-    name: data.name || "",
-    company: data.company || "",
-    email: data.email || "",
-    createdAt: data.created_at,
-  };
+  setClients([
+    ...clients,
+    {
+      id: data.id,
+      name: data.name || "",
+      company: data.company || "",
+      email: data.email || "",
+      createdAt: data.created_at,
+    },
+  ]);
 
-  setClients([...clients, newClient]);
   alert("Cliente guardado correctamente.");
 }
-
-    const exists = clients.some(
-      (c) =>
-        c.email &&
-        client.email &&
-        c.email.toLowerCase() === client.email.toLowerCase()
-    );
-
-    if (exists) {
-      alert("Ese cliente ya existe por correo.");
-      return;
-    }
-
-    const newClient = {
-      id: `CLI-${Date.now()}`,
-      name: client.name,
-      company: client.company,
-      email: client.email,
-      createdAt: new Date().toISOString(),
-    };
-
-    setClients([...clients, newClient]);
-    alert("Cliente guardado correctamente.");
-  }
-
   function useClient(c) {
     setClient({
       name: c.name || "",
