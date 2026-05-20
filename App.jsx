@@ -522,6 +522,9 @@ async function signOut() {
 
     doc.setFillColor(15, 15, 15);
     doc.rect(0, 0, pageWidth, 86, "F");
+    doc.setDrawColor(255, 102, 0);
+doc.setLineWidth(2);
+doc.line(40, 92, 555, 92);
 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
@@ -573,9 +576,14 @@ async function signOut() {
     doc.setFontSize(11);
     doc.text(`Subtotal: ${money(subtotal)}`, 380, y);
     doc.text(`I.V.A. 16%: ${money(iva)}`, 380, y + 18);
-
+    
+doc.setTextColor(255, 102, 0);
+doc.setFont(undefined, "bold");
+    
     doc.setFontSize(15);
     doc.text(`Total: ${money(total)}`, 380, y + 42);
+    doc.setTextColor(25, 25, 25);
+doc.setFont(undefined, "normal");
 
     doc.setFontSize(10);
     doc.text("Notas", 40, y + 72);
