@@ -520,7 +520,7 @@ async function signOut() {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    doc.setFillColor(12, 29, 46);
+    doc.setFillColor(15, 15, 15);
     doc.rect(0, 0, pageWidth, 86, "F");
 
     doc.setTextColor(255, 255, 255);
@@ -531,7 +531,7 @@ async function signOut() {
     doc.text("Tel. 5580013349", 40, 60);
     doc.text("Gardenias No. 50, Col. San Juan Bosco, C.P. 52946, Atizapán de Zaragoza", 40, 74);
 
-    doc.setTextColor(20, 28, 39);
+    doc.setTextColor(255, 102, 0);
     doc.setFontSize(18);
     doc.text("COTIZACIÓN", 40, 120);
 
@@ -560,7 +560,7 @@ async function signOut() {
         money(i.lineTotal),
       ]),
       styles: { fontSize: 8, cellPadding: 5 },
-      headStyles: { fillColor: [12, 29, 46] },
+      headStyles: { fillColor: [255, 102, 0] },
       columnStyles: {
         1: { cellWidth: 190 },
         4: { halign: "right" },
