@@ -248,13 +248,39 @@ const [authError, setAuthError] = useState("");
       .map((r) => normalizeRow(r, supplier))
       .filter((p) => p.name && p.cost > 0);
 
-    setProducts((prev) => {
-      const sinEsteProveedor = prev.filter((p) => p.supplier !== supplier);
-      return [...sinEsteProveedor, ...parsed];
-    });
+    const { error: deleteError } = await supabase
+  .from("products")
+  .delete()
+  .eq("supplier", supplier);
 
-    alert(`Importados ${parsed.length} productos de ${supplier}`);
-  }
+if (deleteError) {
+  alert("Error al limpiar catálogo anterior: " + deleteError.message);
+  return;
+}
+
+const { error: insertError } = await supabase
+  .from("products")
+  .insert(
+    parsed.map((p) => ({
+      supplier: p.supplier,
+      code: p.code,
+      name: p.name,
+      unit: p.unit,
+      cost: p.cost,
+    }))
+  );
+
+if (insertError) {
+  alert("Error al guardar productos: " + insertError.message);
+  return;
+}
+
+setProducts((prev) => {
+  const sinEsteProveedor = prev.filter((p) => p.supplier !== supplier);
+  return [...sinEsteProveedor, ...parsed];
+});
+
+alert(`Importados ${parsed.length} productos de ${supplier} y guardados en Supabase`);
 
   function addProduct(product) {
     const pct = Number(globalPct || 0);
