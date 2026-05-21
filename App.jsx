@@ -199,8 +199,32 @@ const [authError, setAuthError] = useState("");
 }, []);
 
   useEffect(() => {
-    localStorage.setItem("cotizapro_products", JSON.stringify(products));
-  }, [products]);
+  async function loadProducts() {
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error cargando productos:", error.message);
+      return;
+    }
+
+    if (data && data.length > 0) {
+      setProducts(
+        data.map((p) => ({
+          supplier: p.supplier || "",
+          code: p.code || "",
+          name: p.name || "",
+          unit: p.unit || "Pieza",
+          cost: Number(p.cost || 0),
+        }))
+      );
+    }
+  }
+
+  if (session) loadProducts();
+}, [session]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
