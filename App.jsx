@@ -305,7 +305,7 @@ setProducts((prev) => {
 });
 
 alert(`Importados ${parsed.length} productos de ${supplier} y guardados en Supabase`);
-
+}
   function addProduct(product) {
     const pct = Number(globalPct || 0);
     const unitPrice = quotedPrice(product.cost, pct);
