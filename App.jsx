@@ -1090,7 +1090,7 @@ if (!session) {
                   <Trash2 size={16} />
                 </button>
               </div>
-            ))}
+            })}
           </div>
         )}
       </main>
