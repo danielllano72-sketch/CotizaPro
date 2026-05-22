@@ -46,6 +46,13 @@ function parseNumber(v) {
   return Number(String(v).replace(/\$/g, "").replace(/,/g, "").trim()) || 0;
 }
 
+function normalizeText(text) {
+  return String(text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
 function normalizeRow(row, supplier = "Importado") {
   const keys = Object.fromEntries(
     Object.entries(row).map(([k, v]) => [
@@ -227,13 +234,40 @@ const [authError, setAuthError] = useState("");
 }, [session]);
 
   const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim();
-    if (!q) return products.slice(0, 25);
+  const q = normalizeText(query);
 
-    return products
-      .filter((p) => `${p.supplier} ${p.code} ${p.name}`.toLowerCase().includes(q))
-      .slice(0, 25);
-  }, [products, query]);
+  if (!q) return products.slice(0, 50);
+
+  const terms = q.split(" ").filter(Boolean);
+
+  return products
+    .map((p) => {
+      const searchable = normalizeText(`
+        ${p.supplier}
+        ${p.code}
+        ${p.name}
+        ${p.unit}
+      `);
+
+      let score = 0;
+
+      terms.forEach((term) => {
+        if (searchable.includes(term)) score += 1;
+
+        if (normalizeText(p.name).startsWith(term)) score += 3;
+
+        if (normalizeText(p.code) === term) score += 10;
+      });
+
+      return {
+        ...p,
+        score,
+      };
+    })
+    .filter((p) => p.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 50);
+}, [products, query]);
 
   const filteredQuotes = useMemo(() => {
     const q = historyQuery.toLowerCase().trim();
