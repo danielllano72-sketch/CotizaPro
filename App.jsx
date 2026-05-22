@@ -197,12 +197,7 @@ const [authError, setAuthError] = useState("");
   supabase.auth.getSession().then(({ data }) => {
     setSession(data.session);
   });
-useEffect(() => {
-  localStorage.setItem(
-    "cotizapro_favorites",
-    JSON.stringify(favorites)
-  );
-}, [favorites]);
+
   const {
     data: { subscription }
   } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -211,7 +206,13 @@ useEffect(() => {
 
   return () => subscription.unsubscribe();
 }, []);
-
+useEffect(() => {
+  localStorage.setItem(
+    "cotizapro_favorites",
+    JSON.stringify(favorites)
+  );
+}, [favorites]);
+  
   useEffect(() => {
   async function loadProducts() {
     const { data, error } = await supabase
