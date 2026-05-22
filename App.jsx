@@ -123,7 +123,9 @@ function App() {
     const saved = safeParse(localStorage.getItem("cotizapro_products"), null);
     return Array.isArray(saved) && saved.length > 0 ? saved : initialProducts;
   });
-
+const [favorites, setFavorites] = useState(() => {
+  return safeParse(localStorage.getItem("cotizapro_favorites"), []);
+});
   const [supplier, setSupplier] = useState("GCP");
   const [query, setQuery] = useState("");
   const [historyQuery, setHistoryQuery] = useState("");
@@ -195,7 +197,12 @@ const [authError, setAuthError] = useState("");
   supabase.auth.getSession().then(({ data }) => {
     setSession(data.session);
   });
-
+useEffect(() => {
+  localStorage.setItem(
+    "cotizapro_favorites",
+    JSON.stringify(favorites)
+  );
+}, [favorites]);
   const {
     data: { subscription }
   } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -339,6 +346,15 @@ setProducts((prev) => {
 });
 
 alert(`Importados ${parsed.length} productos de ${supplier} y guardados en Supabase`);
+}
+  function toggleFavorite(productCode) {
+  setFavorites((prev) => {
+    if (prev.includes(productCode)) {
+      return prev.filter((c) => c !== productCode);
+    }
+
+    return [...prev, productCode];
+  });
 }
   function addProduct(product) {
     const pct = Number(globalPct || 0);
@@ -904,13 +920,64 @@ if (!session) {
                   %
                 </label>
               </div>
+{favorites.length > 0 && (
+  <div style={{ marginBottom: 20 }}>
+    <h3 style={{ marginBottom: 10 }}>
+      ⭐ Favoritos
+    </h3>
 
+    <div className="productList">
+      {products
+        .filter((p) => favorites.includes(p.code))
+        .slice(0, 12)
+        .map((p, idx) => (
+          <button
+            key={`fav-${p.code}-${idx}`}
+            onClick={() => addProduct(p)}
+            className="product"
+          >
+            <span>
+              <b>{p.code || "S/C"}</b> · {p.name}
+            </span>
+
+            <small>
+              {p.supplier} · {money(p.cost)}
+            </small>
+          </button>
+        ))}
+    </div>
+  </div>
+)}
               <div className="productList">
                 {filtered.map((p, idx) => (
                   <button key={`${p.supplier}-${p.code}-${idx}`} onClick={() => addProduct(p)} className="product">
                     <span><b>{p.code || "S/C"}</b> · {p.name}</span>
                     <small>{p.supplier} · {p.unit} · Costo {money(p.cost)}</small>
-                    <Plus size={16} />
+                    <div
+  style={{
+    display: "flex",
+    gap: 8,
+    alignItems: "center",
+  }}
+>
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      toggleFavorite(p.code);
+    }}
+    style={{
+      border: "none",
+      background: "transparent",
+      cursor: "pointer",
+      fontSize: 18,
+    }}
+  >
+    {favorites.includes(p.code) ? "⭐" : "☆"}
+  </button>
+
+  <Plus size={16} />
+</div>
                   </button>
                 ))}
               </div>
